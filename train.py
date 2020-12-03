@@ -37,7 +37,7 @@ class Trainer:
                     # but it should be fine in this case since the problem does not evolve over time
                     break
                 timestep += 1
-            
+            print("Episode {} score: {}, epsilon: {}".format(i, scores, self.agent.epsilon))
             all_agent_scores.append(scores)
             t = time.time()
             mvg_avg = np.mean(all_agent_scores[-average_window:])
@@ -45,24 +45,24 @@ class Trainer:
             print('Episode {} ({:.2f}s) -- Min: {:.2f} -- Max: {:.2f} -- Mean: {:.2f} -- Moving Average: {:.2f}'
                 .format(i, t - self.last_time, np.min(scores), np.max(scores), np.mean(scores), mvg_avg))
             self.last_time = t
-            if mvg_avg > 30 and len(all_agent_scores) >= 100:
+            if mvg_avg > solve_score and len(all_agent_scores) >= average_window:
                 break
         
         # Save model
         self.agent.save(path=save_dir)
         # Save scores for analysis
         all_agent_scores = np.array(all_agent_scores)
-        np.save(os.path.join(save_dir, 'all_scores.npy'), all_scores)
-        return 
+        np.save(os.path.join(save_dir, 'all_scores.npy'), all_agent_scores)
+        return all_agent_scores
 
 def moving_averages(values, window=100):
     return [np.mean(values[:i+1][-window:]) for i, _ in enumerate(values)]
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Train an agent.')
-    parser.add_argument('--env_path', type=str, default="./envs/Tennis_Linux_NoVis/Tennis.x86_64", help='path to Unity ML Agents environnment file')
+    parser.add_argument('--env_path', type=str, default="./envs/Tennis_Linux/Tennis.x86_64", help='path to Unity ML Agents environnment file')
     parser.add_argument('--average_window', type=int, default=100, help='window size for moving average score')
-    parser.add_argument('--solve_score', type=int, default=30, help='target score to consider training solved')
+    parser.add_argument('--solve_score', type=int, default=0.5, help='target score to consider training solved')
     parser.add_argument('--max_episodes', type=int, default=200, help='maximum number of training episodes')
     parser.add_argument('--checkpoints_path', type=str, default="./checkpoints", help='path to save checkpoint_actor.pth and checkpoint_critic.pth models')
     args = parser.parse_args()
@@ -91,4 +91,4 @@ if __name__ == "__main__":
     plt.plot(mvg_avgs, color='black', linewidth=2)
     plt.ylabel("score")
     plt.xlabel("episode")
-    plt.savefig("scores.png")
+    plt.savefig("assets/scores.png")

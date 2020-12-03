@@ -20,7 +20,8 @@ WEIGHT_DECAY = 0        # L2 weight decay
 LEARN_EVERY = 20        # learn on every ?th step
 UPDATES_PER_LEARN = 10  # perform ? updates per learn
 EPSILON = 1.0           # explore->exploit noise process added to act step
-EPSILON_DECAY = 1e-6    # decay rate for noise process
+EPSILON_DECAY = 0.9999  # decay rate for noise process
+EPSILON_MIN = 0.01      # minimum epsilon for lifelong exploration
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -77,7 +78,14 @@ class DDPGAgent():
             action = self.actor_local(state).cpu().data.numpy()
         self.actor_local.train()
         if add_noise:
-            action += self.epsilon * self.noise.sample()
+            # noise_term = self.epsilon * self.noise.sample()
+            # print("action", action)
+            # print("noise_term", noise_term)
+            # action += noise_term
+
+            # Epsilon-greedy action selection
+            if random.random() < self.epsilon:
+                action = np.random.randn(action.shape[0], action.shape[1])
         return np.clip(action, -1, 1)
 
     def reset(self):
@@ -125,7 +133,7 @@ class DDPGAgent():
         self.soft_update(self.actor_local, self.actor_target, TAU)                     
 
         # # ---------------------------- update noise ---------------------------- #
-        self.epsilon -= EPSILON_DECAY
+        self.epsilon = max(self.epsilon * EPSILON_DECAY, EPSILON_MIN)
         self.noise.reset()
 
     def soft_update(self, local_model, target_model, tau):
