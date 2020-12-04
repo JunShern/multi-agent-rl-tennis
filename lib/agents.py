@@ -149,16 +149,17 @@ class DDPGAgent():
         for target_param, local_param in zip(target_model.parameters(), local_model.parameters()):
             target_param.data.copy_(tau*local_param.data + (1.0-tau)*target_param.data)
 
-    def save(self, path="./"):
-        torch.save(self.actor_local.state_dict(), os.path.join(path, 'checkpoint_actor.pth'))
-        torch.save(self.critic_local.state_dict(), os.path.join(path, 'checkpoint_critic.pth'))
+    def save(self, path):
+        checkpoint = {
+            'actor': self.actor_local.state_dict(),
+            'critic': self.critic_local.state_dict()
+        }
+        torch.save(checkpoint, path)
 
-    def load(self, path="./"):
-        checkpoint_actor = torch.load(os.path.join(path, 'checkpoint_actor.pth'))
-        checkpoint_critic = torch.load(os.path.join(path, 'checkpoint_critic.pth'))
-        self.actor_local.load_state_dict(checkpoint_actor)
-        self.critic_local.load_state_dict(checkpoint_critic)
-
+    def load(self, path):
+        checkpoint = torch.load(path)
+        self.actor_local.load_state_dict(checkpoint['actor'])
+        self.critic_local.load_state_dict(checkpoint['critic'])
 
 class OUNoise:
     """Ornstein-Uhlenbeck process."""
