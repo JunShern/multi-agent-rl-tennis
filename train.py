@@ -29,8 +29,7 @@ class Trainer:
 
                 # Act
                 rewards, next_states, dones = self.env.step(actions)
-                for state, action, reward, next_state, done in zip(states, actions, rewards, next_states, dones):
-                    self.agent.step(state, action, reward, next_state, done, timestep)
+                self.agent.step(states, actions, rewards, next_states, dones, timestep)
 
                 # Update
                 scores += rewards
