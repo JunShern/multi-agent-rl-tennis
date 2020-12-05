@@ -1,4 +1,5 @@
-from lib import env, agents
+from lib.agents import DDPGAgent
+from lib.env import EnvUnityMLAgents
 import argparse
 import numpy as np
 
@@ -9,8 +10,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Setup
-    env = env.EnvUnityMLAgents(args.env_path, train_mode=False)
-    agent = agents.DDPGAgent(env.state_size, env.action_size, random_seed=0)
+    env = EnvUnityMLAgents(args.env_path, train_mode=False)
+    agent = DDPGAgent(env.state_size, env.action_size, random_seed=0)
     agent.load(path=args.model_path)
 
     for i in range(10):

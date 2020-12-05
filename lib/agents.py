@@ -57,19 +57,18 @@ class DDPGAgent():
         self.noise = OUNoise(action_size, random_seed)
 
         # Replay memory
-        self.memory = ReplayBuffer(action_size, BUFFER_SIZE, BATCH_SIZE, random_seed)
+        self.memory = ReplayBuffer(BUFFER_SIZE, BATCH_SIZE, random_seed)
     
-    def step(self, states, actions, rewards, next_states, dones, timestep):
+    def step(self, state, action, reward, next_state, done, timestep):
         """Save experience in replay memory, and use random sample from buffer to learn."""
-        for state, action, reward, next_state, done in zip(states, actions, rewards, next_states, dones):
-            # Save experience / reward
-            self.memory.add(state, action, reward, next_state, done)
+        # Save experience / reward
+        self.memory.add(state, action, reward, next_state, done)
 
-            # Learn, if enough samples are available in memory
-            if len(self.memory) > BATCH_SIZE and timestep % LEARN_EVERY == 0:
-                for _ in range(UPDATES_PER_LEARN):
-                    experiences = self.memory.sample()
-                    self.learn(experiences, GAMMA)
+        # Learn, if enough samples are available in memory
+        if len(self.memory) > BATCH_SIZE and timestep % LEARN_EVERY == 0:
+            for _ in range(UPDATES_PER_LEARN):
+                experiences = self.memory.sample()
+                self.learn(experiences, GAMMA)
 
     def act(self, state, add_noise=True):
         """Returns actions for given state as per current policy."""
@@ -187,14 +186,13 @@ class OUNoise:
 class ReplayBuffer:
     """Fixed-size buffer to store experience tuples."""
 
-    def __init__(self, action_size, buffer_size, batch_size, seed):
+    def __init__(self, buffer_size, batch_size, seed):
         """Initialize a ReplayBuffer object.
         Params
         ======
             buffer_size (int): maximum size of buffer
             batch_size (int): size of each training batch
         """
-        self.action_size = action_size
         self.memory = deque(maxlen=buffer_size)  # internal memory (deque)
         self.batch_size = batch_size
         self.experience = namedtuple("Experience", field_names=["state", "action", "reward", "next_state", "done"])
