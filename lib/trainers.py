@@ -1,4 +1,5 @@
 from lib import utils
+from lib.agents import BATCH_SIZE, LEARN_EVERY, UPDATES_PER_LEARN, GAMMA
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -26,11 +27,13 @@ class Trainer():
             _, states, _ = self.env.reset()
             scores = np.zeros(self.env.num_agents)
             for timestep in range(self.max_steps_per_episode):
-                # select an action (for each agent)
+                # Select an action
                 actions = self.agent.act(states, add_noise=True) # Network expects inputs in batches so feed all at once
 
                 # Act
                 rewards, next_states, dones = self.env.step(actions)
+
+                # Learn
                 for state, action, reward, next_state, done in zip(states, actions, rewards, next_states, dones):
                     self.agent.step(state, action, reward, next_state, done, timestep)
 
@@ -80,6 +83,7 @@ class Trainer():
         plt.ylabel("score")
         plt.xlabel("episode")
         plt.savefig(os.path.join(self.save_dir, file_prefix + "scores.png"))
+        plt.close()
 
 """
 Multiple agents acting independently with no sharing of information.
@@ -103,11 +107,13 @@ class MultiAgentIndependentTrainer():
             _, states, _ = self.env.reset()
             scores = np.zeros(self.env.num_agents)
             for timestep in range(self.max_steps_per_episode):
-                # select an action (for each agent)
+                # Select an action
                 actions = [agent.act(states[a][np.newaxis, ...], add_noise=True) for a, agent in enumerate(self.agents)]
 
                 # Act
                 rewards, next_states, dones = self.env.step(actions)
+
+                # Learn
                 for agent, state, action, reward, next_state, done in zip(self.agents, states, actions, rewards, next_states, dones):
                     agent.step(state, action, reward, next_state, done, timestep)
 
@@ -158,3 +164,62 @@ class MultiAgentIndependentTrainer():
         plt.ylabel("score")
         plt.xlabel("episode")
         plt.savefig(os.path.join(self.save_dir, file_prefix + "scores.png"))
+        plt.close()
+
+"""
+Multi-agent trainer with centralized training (update step) and decentralized execution (action step).
+"""
+class MADDPGTrainer(MultiAgentIndependentTrainer):
+    def train(self):
+        self.all_agent_scores = []
+        for i in range(self.max_episodes):
+
+            _, states, _ = self.env.reset()
+            scores = np.zeros(self.env.num_agents)
+            for timestep in range(self.max_steps_per_episode):
+                # Select an action
+                actions = [agent.act(states[a][np.newaxis, ...], add_noise=True) for a, agent in enumerate(self.agents)]
+
+                # Act
+                rewards, next_states, dones = self.env.step(actions)
+
+                # Save to SHARED replay buffer
+                # Using agent[0]'s buffer as the shared replay buffer
+                for state, action, reward, next_state, done in zip(states, actions, rewards, next_states, dones):
+                    self.agents[0].memory.add(state, action, reward, next_state, done)
+                
+                # all_states = states.reshape(1, -1)  # reshape 2x24 into 1x48 dim vector
+                # all_next_states = next_states.reshape(1, -1)  # reshape 2x24 into 1x48 dim vector
+                # self.agents[0].memory.add(all_states, actions, rewards, all_next_states, dones)
+
+                for agent in self.agents:
+                    # Learn if enough samples are available in memory
+                    if len(self.agents[0].memory) > BATCH_SIZE and timestep % LEARN_EVERY == 0:
+                        for _ in range(UPDATES_PER_LEARN):
+                            experiences = self.agents[0].memory.sample() # Everyone samples from the shared buffer
+                            agent.learn(experiences, GAMMA)
+                
+                # Update
+                scores += rewards
+                states = next_states
+                
+                # Exit if any of the agents finish 
+                if np.any(dones):
+                    break
+                
+            print("Episode {} score: {}, timesteps: {}, epsilon: {}".format(i, scores, timestep, self.agents[0].epsilon))
+            self.all_agent_scores.append(scores)
+            t = time.time()
+            mvg_avg = np.mean(self.all_agent_scores[-self.average_window:])
+
+            print('Episode {} ({:.2f}s) -- Min: {:.2f} -- Max: {:.2f} -- Mean: {:.2f} -- Moving Average: {:.2f}'
+                .format(i, t - self.last_time, np.min(scores), np.max(scores), np.mean(scores), mvg_avg))
+            self.last_time = t
+            # if mvg_avg > self.solve_score and len(all_agent_scores) >= self.average_window:
+            #     break
+            
+            if i % 100 == 0:
+                self.save_progress(i)
+        
+        self.save_progress(i)
+        return self.all_agent_scores

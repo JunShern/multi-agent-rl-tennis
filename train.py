@@ -1,6 +1,6 @@
 from lib.agents import DDPGAgent
 from lib.env import EnvUnityMLAgents
-from lib.trainers import Trainer, MultiAgentIndependentTrainer
+from lib.trainers import Trainer, MultiAgentIndependentTrainer, MADDPGTrainer
 import argparse
 
 if __name__ == "__main__":
@@ -15,21 +15,27 @@ if __name__ == "__main__":
 
     # Setup
     env = EnvUnityMLAgents(args.env_path, train_mode=True)
-    agent = DDPGAgent(env.state_size, env.action_size, random_seed=0)
-    # agents = [DDPGAgent(env.state_size, env.action_size, random_seed=0) for _ in range(env.num_agents)]
+    # agent = DDPGAgent(env.state_size, env.action_size, random_seed=0)
+    agents = [DDPGAgent(env.state_size, env.action_size, random_seed=0) for _ in range(env.num_agents)]
 
     # Train
-    trainer = Trainer(agent, env,
-        average_window=args.average_window, 
-        solve_score=args.solve_score,
-        max_episodes=args.max_episodes,
-        max_steps_per_episode=args.max_steps,
-        save_dir=args.checkpoints_path)
+    # trainer = Trainer(agent, env,
+    #     average_window=args.average_window, 
+    #     solve_score=args.solve_score,
+    #     max_episodes=args.max_episodes,
+    #     max_steps_per_episode=args.max_steps,
+    #     save_dir=args.checkpoints_path)
     # trainer = MultiAgentIndependentTrainer(agents, env,
     #     average_window=args.average_window, 
     #     solve_score=args.solve_score,
     #     max_episodes=args.max_episodes,
     #     max_steps_per_episode=args.max_steps,
     #     save_dir=args.checkpoints_path)
+    trainer = MADDPGTrainer(agents, env,
+        average_window=args.average_window, 
+        solve_score=args.solve_score,
+        max_episodes=args.max_episodes,
+        max_steps_per_episode=args.max_steps,
+        save_dir=args.checkpoints_path)
     scores = trainer.train()
     env.close()
