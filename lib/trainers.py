@@ -45,17 +45,20 @@ class Trainer():
                 if np.any(dones):
                     break
                 
-            print("Episode {} score: {}, timesteps: {}, epsilon: {}".format(i, scores, timestep, self.agent.epsilon))
             self.all_agent_scores.append(scores)
+
             t = time.time()
             mvg_avg = np.mean(self.all_agent_scores[-self.average_window:])
+            mvg_avg_max = np.mean(np.max(self.all_agent_scores[-self.average_window:], axis=1))
+            print("Episode {} ({:.2f}s) -- Timesteps: {} -- Epsilon: {:.3f} -- Min: {:.3f} -- Max: {:.3f}\
+                 -- Mean: {:.3f} -- Moving Average: {:.3f} -- Moving Average Max: {:.3f}"
+                .format(i, t - self.last_time, timestep, self.agents[0].epsilon, 
+                np.min(scores), np.max(scores), np.mean(scores), mvg_avg, mvg_avg_max))
 
-            print('Episode {} ({:.2f}s) -- Min: {:.2f} -- Max: {:.2f} -- Mean: {:.2f} -- Moving Average: {:.2f}'
-                .format(i, t - self.last_time, np.min(scores), np.max(scores), np.mean(scores), mvg_avg))
-            self.last_time = t
             # if mvg_avg > self.solve_score and len(all_agent_scores) >= self.average_window:
             #     break
             
+            self.last_time = t
             if i % 100 == 0:
                 self.save_progress(i)
         
@@ -69,26 +72,30 @@ class Trainer():
         self.agent.save(os.path.join(self.save_dir, file_prefix + 'checkpoint.pth'))
 
         # Save scores for analysis
-        scores = np.array(self.all_agent_scores)
-        np.save(os.path.join(self.save_dir, file_prefix + 'scores.npy'), scores)
+        np.save(os.path.join(self.save_dir, file_prefix + 'scores.npy'), self.all_agent_scores)
 
+        # Save plot of results
+        self.save_training_plot(os.path.join(self.save_dir, file_prefix + "scores.png"))
+
+    def save_training_plot(self, path):
+        scores = np.array(self.all_agent_scores)
         # Save plot of results
         plt.figure(figsize=(20, 10))
         for agent_idx in range(scores.shape[1]):
             plt.plot(scores[:, agent_idx])
         plt.fill_between(x=range(len(scores)), y1=scores.min(axis=1), y2=scores.max(axis=1), alpha=0.2)
-        mvg_avgs = utils.moving_averages(np.mean(scores, axis=1), window=self.average_window)
+        mvg_avgs = utils.moving_averages(np.max(scores, axis=1), window=self.average_window)
         plt.axhline(y = self.solve_score, color="red")
         plt.plot(mvg_avgs, color='black', linewidth=2)
         plt.ylabel("score")
         plt.xlabel("episode")
-        plt.savefig(os.path.join(self.save_dir, file_prefix + "scores.png"))
+        plt.savefig(path)
         plt.close()
 
 """
 Multiple agents acting independently with no sharing of information.
 """
-class MultiAgentIndependentTrainer():
+class MultiAgentIndependentTrainer(Trainer):
     def __init__(self, agents, env, average_window = 100, solve_score = 30, max_episodes = 200, max_steps_per_episode = 1000, save_dir = "./"):
         self.agents = agents
         self.env = env
@@ -125,17 +132,20 @@ class MultiAgentIndependentTrainer():
                 if np.any(dones):
                     break
                 
-            print("Episode {} score: {}, timesteps: {}, epsilon: {}".format(i, scores, timestep, self.agents[0].epsilon))
             self.all_agent_scores.append(scores)
+
             t = time.time()
             mvg_avg = np.mean(self.all_agent_scores[-self.average_window:])
+            mvg_avg_max = np.mean(np.max(self.all_agent_scores[-self.average_window:], axis=1))
+            print("Episode {} ({:.2f}s) -- Timesteps: {} -- Epsilon: {:.3f} -- Min: {:.3f} -- Max: {:.3f} -- "
+                "Mean: {:.3f} -- Moving Average: {:.3f} -- Moving Average Max: {:.3f}"
+                .format(i, t - self.last_time, timestep, self.agents[0].epsilon, 
+                np.min(scores), np.max(scores), np.mean(scores), mvg_avg, mvg_avg_max))
 
-            print('Episode {} ({:.2f}s) -- Min: {:.2f} -- Max: {:.2f} -- Mean: {:.2f} -- Moving Average: {:.2f}'
-                .format(i, t - self.last_time, np.min(scores), np.max(scores), np.mean(scores), mvg_avg))
-            self.last_time = t
             # if mvg_avg > self.solve_score and len(all_agent_scores) >= self.average_window:
             #     break
             
+            self.last_time = t
             if i % 100 == 0:
                 self.save_progress(i)
         
@@ -150,21 +160,10 @@ class MultiAgentIndependentTrainer():
             agent.save(os.path.join(self.save_dir, file_prefix + 'agent{}_checkpoint.pth'.format(i)))
 
         # Save scores for analysis
-        scores = np.array(self.all_agent_scores)
-        np.save(os.path.join(self.save_dir, file_prefix + 'scores.npy'), scores)
+        np.save(os.path.join(self.save_dir, file_prefix + 'scores.npy'), self.all_agent_scores)
 
         # Save plot of results
-        plt.figure(figsize=(20, 10))
-        for agent_idx in range(scores.shape[1]):
-            plt.plot(scores[:, agent_idx])
-        plt.fill_between(x=range(len(scores)), y1=scores.min(axis=1), y2=scores.max(axis=1), alpha=0.2)
-        mvg_avgs = utils.moving_averages(np.mean(scores, axis=1), window=self.average_window)
-        plt.axhline(y = self.solve_score, color="red")
-        plt.plot(mvg_avgs, color='black', linewidth=2)
-        plt.ylabel("score")
-        plt.xlabel("episode")
-        plt.savefig(os.path.join(self.save_dir, file_prefix + "scores.png"))
-        plt.close()
+        self.save_training_plot(os.path.join(self.save_dir, file_prefix + "scores.png"))
 
 """
 Multi-agent trainer with centralized training (update step) and decentralized execution (action step).
@@ -188,10 +187,6 @@ class MADDPGTrainer(MultiAgentIndependentTrainer):
                 for state, action, reward, next_state, done in zip(states, actions, rewards, next_states, dones):
                     self.agents[0].memory.add(state, action, reward, next_state, done)
                 
-                # all_states = states.reshape(1, -1)  # reshape 2x24 into 1x48 dim vector
-                # all_next_states = next_states.reshape(1, -1)  # reshape 2x24 into 1x48 dim vector
-                # self.agents[0].memory.add(all_states, actions, rewards, all_next_states, dones)
-
                 for agent in self.agents:
                     # Learn if enough samples are available in memory
                     if len(self.agents[0].memory) > BATCH_SIZE and timestep % LEARN_EVERY == 0:
@@ -207,17 +202,20 @@ class MADDPGTrainer(MultiAgentIndependentTrainer):
                 if np.any(dones):
                     break
                 
-            print("Episode {} score: {}, timesteps: {}, epsilon: {}".format(i, scores, timestep, self.agents[0].epsilon))
             self.all_agent_scores.append(scores)
+
             t = time.time()
             mvg_avg = np.mean(self.all_agent_scores[-self.average_window:])
+            mvg_avg_max = np.mean(np.max(self.all_agent_scores[-self.average_window:], axis=1))
+            print("Episode {} ({:.2f}s) -- Timesteps: {} -- Epsilon: {:.3f} -- Min: {:.3f} -- Max: {:.3f} -- "
+                "Mean: {:.3f} -- Moving Average: {:.3f} -- Moving Average Max: {:.3f}"
+                .format(i, t - self.last_time, timestep, self.agents[0].epsilon, 
+                np.min(scores), np.max(scores), np.mean(scores), mvg_avg, mvg_avg_max))
 
-            print('Episode {} ({:.2f}s) -- Min: {:.2f} -- Max: {:.2f} -- Mean: {:.2f} -- Moving Average: {:.2f}'
-                .format(i, t - self.last_time, np.min(scores), np.max(scores), np.mean(scores), mvg_avg))
-            self.last_time = t
             # if mvg_avg > self.solve_score and len(all_agent_scores) >= self.average_window:
             #     break
             
+            self.last_time = t
             if i % 100 == 0:
                 self.save_progress(i)
         
