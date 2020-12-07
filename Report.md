@@ -87,7 +87,7 @@ _The plot above shows the training progress over 1500 episodes, reaching the sol
 
 The following gif shows the final policies' successful performance on the task, after completing all 1500 training episodes:
 
-![trained_agent](assets/trained_agent.gif)
+![trained_agent](assets/trained_agents.gif)
 
 To see the full progression of both agents training from scratch, check out [this video](https://youtu.be/KMBmxojIP58)!
 
